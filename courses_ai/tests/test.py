@@ -1,0 +1,14 @@
+from courses_ai.src.graph.graph import build_graph
+
+app = build_graph()
+
+resultat = app.invoke({
+    "sujet": "Les bienfaits de la marche en montagne",
+    "article": "",
+    "verdict": "",
+    "remarques": "",
+    "tours": 0,
+})
+
+print(resultat["verdict"])
+print(resultat["article"])
