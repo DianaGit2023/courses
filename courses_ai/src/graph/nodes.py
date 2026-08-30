@@ -3,9 +3,9 @@ Nœuds du graphe : chaque fonction prend le State en entrée et retourne
 les champs du State à mettre à jour.
 """
 
-from courses_ai.src.agents.redacteur import agent_redac
-from courses_ai.src.agents.analyseur import agent_ana
-from courses_ai.src.graph.state import BlogState
+from src.agents.redacteur import agent_redac
+from src.agents.analyseur import agent_ana
+from src.graph.state import BlogState
 
 
 def node_redacteur(state: BlogState) -> dict:

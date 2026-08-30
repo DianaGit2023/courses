@@ -1,4 +1,4 @@
-from courses_ai.src.graph.graph import build_graph
+from src.graph.graph import build_graph
 
 app = build_graph()
 

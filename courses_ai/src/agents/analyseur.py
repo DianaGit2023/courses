@@ -21,7 +21,7 @@ TODO :
 - définir les outils auxquels il a accès (le cas échéant, depuis src/tools)
 - implémenter la fonction appelée par le nœud correspondant dans src/graph/nodes.py
 """
-from courses_ai.src.llm.ollama_client import get_llm
+from src.llm.ollama_client import get_llm
 from langchain_core.prompts import PromptTemplate
 
 def agent_ana(sujet: str, article: str):

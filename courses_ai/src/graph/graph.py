@@ -10,8 +10,8 @@ TODO :
 
 from langgraph.graph import StateGraph, START, END
 
-from courses_ai.src.graph.state import BlogState
-from courses_ai.src.graph.nodes import node_redacteur, node_analyseur
+from src.graph.state import BlogState
+from src.graph.nodes import node_redacteur, node_analyseur
 
 MAX_TOURS = 3
 

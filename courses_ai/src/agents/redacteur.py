@@ -7,7 +7,7 @@ passages suivants à partir des remarques du critique.
 Entrées : sujet (str), et optionnellement article (str) + critique (str).
 Sortie : le texte de l'article en Markdown (str).
 """
-from courses_ai.src.llm.ollama_client import get_llm
+from src.llm.ollama_client import get_llm
 from langchain_core.prompts import ChatPromptTemplate
 
 SYSTEM_REDACTION = """

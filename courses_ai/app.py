@@ -9,8 +9,8 @@ from datetime import datetime
 
 import streamlit as st
 
-from courses_ai.src.graph.graph import build_graph
-from courses_ai.src.ui.components import (
+from src.graph.graph import build_graph
+from src.ui.components import (
     bloc_message,
     bloc_note,
     carte_article,
