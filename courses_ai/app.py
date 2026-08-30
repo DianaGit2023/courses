@@ -1,32 +1,39 @@
-# """
-# Point d'entrée Streamlit.
+"""
+Point d'entrée Streamlit — branché sur le graphe LangGraph.
 
-# TODO :
-# - st.set_page_config(...)
-# - construire / récupérer le graphe (src.graph.graph)
-# - gérer l'état de session (historique de conversation, résultats intermédiaires...)
-# - afficher les entrées utilisateur et les sorties du système multi-agents
-# """
-# """
+Lancement :  streamlit run courses_ai/src/ui/app.py
+(depuis la racine du projet, avec le venv actif)
+"""
 
-
-import time
+from datetime import datetime
 
 import streamlit as st
+
+from courses_ai.src.graph.graph import build_graph
+from courses_ai.src.ui.components import (
+    bloc_message,
+    bloc_note,
+    carte_article,
+    date_fr,
+    extraire_lede,
+    extraire_titre,
+    gutter,
+    markdown_vers_html,
+    steps,
+    temps_lecture,
+)
 
 TONS = ["Intime", "Documenté", "Manifeste", "Guide pratique"]
 FORMATS = ["Court · ~400 mots", "Standard · ~500 mots", "Long · ~600 mots"]
 
-FAUX_TEXTE = (
-    "<p>On croit photographier un objet. On photographie en réalité la manière dont "
-    "la lumière le quitte. Le sujet n'est qu'un prétexte : ce qui compose une image, "
-    "c'est l'endroit exact où le clair devient sombre.</p>"
-    "<h3>Regarder plus lentement</h3>"
-    "<p>Un même angle, à deux heures d'intervalle, donne deux images qui n'ont rien "
-    "à se dire. La patience n'est pas une vertu ici, c'est une technique.</p>"
-)
-
 st.set_page_config(page_title="La Revue", page_icon="—", layout="centered")
+
+
+@st.cache_resource(show_spinner=False)
+def get_graphe():
+    """Le graphe n'est compilé qu'une fois, pas à chaque rerun Streamlit."""
+    return build_graph()
+
 
 # ── style ────────────────────────────────────────────────────────────────────
 st.markdown(
@@ -119,6 +126,8 @@ st.markdown(
 .prose p{ font-size:1.1rem; line-height:1.78; margin:0 0 1.3rem; font-weight:300; }
 .prose p:first-of-type:first-letter{ font-family:'Instrument Serif',serif; float:left;
   font-size:3.4rem; line-height:.86; padding:.1rem .5rem 0 0; color:var(--accent); }
+.prose p.puce{ padding-left:1.1rem; text-indent:-1.1rem; margin-bottom:.5rem; }
+.prose p.puce:first-letter{ float:none; font-size:inherit; padding:0; color:inherit; }
 .prose h3{ font-family:'IBM Plex Mono',monospace !important; font-size:.66rem;
   letter-spacing:.14em; text-transform:uppercase; color:var(--graphite);
   margin:2.2rem 0 1rem; font-weight:400; }
@@ -132,25 +141,12 @@ st.markdown(
 )
 
 
-def gutter(num, label):
-    return f'<div class="gut"><div class="n">{num}</div><div class="l">{label}</div></div>'
-
-
-def steps(etats):
-    out = []
-    for i, nom in enumerate(["Rédaction", "Relecture", "Publication"]):
-        if i:
-            out.append('<span class="arrow">→</span>')
-        out.append(
-            f'<span class="step {etats.get(nom, "")}"><span class="dot"></span>'
-            f'<span class="lb">{nom}</span></span>'
-        )
-    return f'<div class="steps">{"".join(out)}</div>'
-
-
-# ── état ─────────────────────────────────────────────────────────────────────
+# ── état de session ──────────────────────────────────────────────────────────
 if "articles" not in st.session_state:
     st.session_state.articles = []
+if "dernier_run" not in st.session_state:
+    st.session_state.dernier_run = None
+
 
 # ── manchette + chapeau ──────────────────────────────────────────────────────
 st.markdown(
@@ -162,6 +158,7 @@ st.markdown(
     "Ce qui passe la relecture est publié ci-dessous.</p></div>",
     unsafe_allow_html=True,
 )
+
 
 # ── 01 · le sujet ────────────────────────────────────────────────────────────
 st.markdown('<div class="sec"></div>', unsafe_allow_html=True)
@@ -179,6 +176,7 @@ with c:
     d.markdown('<div style="height:1.62rem"></div>', unsafe_allow_html=True)
     lancer = d.button("Écrire l'article", disabled=not sujet.strip())
 
+
 # ── 02 · la fabrique ─────────────────────────────────────────────────────────
 st.markdown('<div class="sec"></div>', unsafe_allow_html=True)
 g, c = st.columns([1, 3.4], gap="medium")
@@ -188,35 +186,93 @@ with c:
     scene = st.empty()
     retour = st.empty()
 
-if not lancer:
+if lancer:
+    graphe = get_graphe()
+
+    etat = {
+        "sujet": sujet.strip(),
+        "article": "",
+        "critique": "",
+        "iterations": 0,
+        "valide": False,
+    }
+    etats_frise = {"Rédaction": "on"}
+    scene.markdown(steps(etats_frise), unsafe_allow_html=True)
+
+    try:
+        # stream() renvoie, après chaque nœud, uniquement les champs modifiés.
+        # On les fusionne dans notre copie pour reconstituer l'état final.
+        for evenement in graphe.stream(etat):
+            for nom_noeud, maj in evenement.items():
+                etat.update(maj)
+
+                if nom_noeud == "redacteur":
+                    etats_frise = {"Rédaction": "done", "Relecture": "on"}
+                elif nom_noeud == "analyseur":
+                    if etat.get("valide"):
+                        etats_frise = {
+                            "Rédaction": "done",
+                            "Relecture": "done",
+                            "Publication": "done",
+                        }
+                    else:
+                        # verdict « à réviser » : on repart chez le rédacteur
+                        etats_frise = {"Rédaction": "on", "Relecture": "done"}
+
+                scene.markdown(steps(etats_frise), unsafe_allow_html=True)
+    except Exception as e:
+        etat["erreur_technique"] = str(e)
+
+    st.session_state.dernier_run = {"etat": etat, "ton": ton, "format": fmt}
+
+    article = etat.get("article", "")
+    hors_perimetre = article.lstrip().startswith("HORS PÉRIMÈTRE")
+    plantage = "erreur_technique" in etat or etat.get("critique", "").startswith("Erreur")
+
+    if not plantage and not hors_perimetre and article.strip():
+        st.session_state.articles.insert(
+            0,
+            {
+                "titre": extraire_titre(article, defaut=sujet.strip()),
+                "sujet": sujet.strip(),
+                "ton": ton,
+                "date": date_fr(datetime.now()),
+                "lecture": temps_lecture(article),
+                "lede": extraire_lede(article),
+                "corps": markdown_vers_html(article),
+                "valide": bool(etat.get("valide")),
+            },
+        )
+
+# ── affichage de la fabrique (persiste entre deux reruns) ────────────────────
+run = st.session_state.dernier_run
+if run is None:
     scene.markdown(steps({}), unsafe_allow_html=True)
 else:
-    for etats in (
-        {"Rédaction": "on"},
-        {"Rédaction": "done", "Relecture": "on"},
-        {"Rédaction": "done", "Relecture": "done", "Publication": "done"},
-    ):
-        scene.markdown(steps(etats), unsafe_allow_html=True)
-        time.sleep(0.9)
+    etat = run["etat"]
+    article = etat.get("article", "")
 
-    retour.markdown(
-        '<div class="note"><div class="h">Note du rédacteur en chef — 8/10</div><ul>'
-        "<li>L'accroche tarde de deux paragraphes.</li>"
-        "<li>Le troisième exemple répète le premier.</li></ul></div>",
-        unsafe_allow_html=True,
-    )
-    st.session_state.articles.insert(
-        0,
-        {
-            "titre": "Ce que la lumière fait aux choses",
-            "sujet": sujet.strip(),
-            "ton": ton,
-            "date": "29 août 2026",
-            "lecture": 2,
-            "lede": "On croit photographier un objet. On photographie en réalité la "
-            "manière dont la lumière le quitte…",
-        },
-    )
+    if "erreur_technique" in etat:
+        retour.markdown(
+            bloc_message("Le graphe s'est interrompu", etat["erreur_technique"]),
+            unsafe_allow_html=True,
+        )
+    elif etat.get("critique", "").startswith("Erreur"):
+        retour.markdown(
+            bloc_message("Un agent n'a pas répondu", etat["critique"]),
+            unsafe_allow_html=True,
+        )
+    elif article.lstrip().startswith("HORS PÉRIMÈTRE"):
+        retour.markdown(
+            bloc_message("Sujet refusé", article),
+            unsafe_allow_html=True,
+        )
+    elif etat.get("critique"):
+        retour.markdown(
+            bloc_note(etat["critique"], bool(etat.get("valide")), etat.get("iterations", 0)),
+            unsafe_allow_html=True,
+        )
+
 
 # ── 03 · l'archive ───────────────────────────────────────────────────────────
 st.markdown('<div class="sec"></div>', unsafe_allow_html=True)
@@ -232,20 +288,7 @@ with c:
 if st.session_state.articles:
     total = len(st.session_state.articles)
     entries = "".join(
-        f"""
-        <details class="entry">
-          <summary>
-            <div class="meta">Nº {total - i:03d}<br>{a['date']}<br>{a['lecture']} min de lecture<br>Relecture 8/10</div>
-            <div>
-              <span class="kicker">{a['ton']} &nbsp;·&nbsp; {a['sujet']}</span>
-              <h2>{a['titre']}</h2>
-              <p class="lede">{a['lede']}</p>
-            </div>
-          </summary>
-          <div class="prose">{FAUX_TEXTE}</div>
-        </details>
-        """
-        for i, a in enumerate(st.session_state.articles)
+        carte_article(a, total - i) for i, a in enumerate(st.session_state.articles)
     )
     st.markdown(f'<div style="margin-top:1.4rem">{entries}</div>', unsafe_allow_html=True)
 else:

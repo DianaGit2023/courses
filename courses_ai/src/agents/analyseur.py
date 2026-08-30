@@ -24,7 +24,7 @@ TODO :
 from courses_ai.src.llm.ollama_client import get_llm
 from langchain_core.prompts import PromptTemplate
 
-def agent_ana():
+def agent_ana(sujet: str, article: str):
 
     llm =  get_llm("llama3.1", 0.5)
 
@@ -68,11 +68,11 @@ def agent_ana():
             """ 
     )
 
-    chain = ana_prompt_prompt | llm # on chaine le prompt avec le llm 
+    chain = ana_prompt | llm # on chaine le prompt avec le llm 
 
     rep_ia = chain.invoke({"sujet": sujet, "article": article})
 
-    return rep_ia
+    return rep_ia.content
 
 
 

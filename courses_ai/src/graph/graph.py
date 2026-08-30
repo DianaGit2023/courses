@@ -17,13 +17,11 @@ MAX_TOURS = 3
 
 
 def apres_analyse(state: BlogState) -> str:
-    if state["verdict"] == "PUBLIABLE":
+    if state.get("valide") or state.get("iterations", 0) >= 3:
         return "fin"
-    if state["tours"] >= MAX_TOURS:
-        return "fin"
-    return "reecrire"
+    return "reecriture"
 
-
+    
 def build_graph():
     workflow = StateGraph(BlogState)
 
@@ -36,7 +34,7 @@ def build_graph():
     workflow.add_conditional_edges(
         "analyseur",
         apres_analyse,
-        {"reecrire": "redacteur", "fin": END},
+        {"fin": END, "reecriture": "redacteur"},
     )
 
     return workflow.compile()

@@ -10,5 +10,6 @@ resultat = app.invoke({
     "tours": 0,
 })
 
-print(resultat["verdict"])
+print(resultat["valide"])
+print(resultat["critique"])
 print(resultat["article"])
